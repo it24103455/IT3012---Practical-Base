@@ -1,75 +1,57 @@
-from grid_game import GridHuntGame
-from agent import SimpleReflexAgent, ModelBasedAgent
+from visual_grid_game import VisualGridHuntGame
+from agent import SearchAgent
 
 
-def run_agent(agent, agent_name):
+def run_search_agent(algorithm):
 
-    print("\n======================================")
-    print(f" Running {agent_name}")
+    print()
+    print("======================================")
+    print(f" Running {algorithm} Search Agent")
     print("======================================")
 
-    env = GridHuntGame()
+    # Create the environment
+    env = VisualGridHuntGame(
+        width=10,
+        height=10,
+        num_food=10,
+        num_opponents=0
+    )
+
+    # Create the search agent
+    agent = SearchAgent()
+
+    # Select BFS, DFS or UCS
+    agent.active_algo = algorithm
 
     while not env.is_done():
 
-        # Agent receives only its percept
-        percept = env.get_percept(agent)
+        # Get the current percept
+        percept = env.get_percept()
 
-        # Agent chooses an action
+        # Ask the agent for the next action
         action = agent.sense_and_act(percept)
 
-        # Environment executes the action
-        env.execute_action(agent, action)
-
         print(
-            f"Percept: {percept} | "
+            f"Position: {percept['agent_pos']} | "
             f"Action: {action} | "
-            f"Score: {env.score} | "
-            f"Food Left: {len(env.food_positions)}"
+            f"Score: {percept['score']} | "
+            f"Food Left: {percept['remaining_food']}"
         )
 
-    print(
-        f"\n{agent_name} finished!"
-    )
+        # Execute the selected action
+        env.execute_action(action)
 
-    print(
-        f"Final Score: {env.score}"
-    )
-
-    print(
-        f"Steps: {env.steps}"
-    )
-
-    print(
-        f"Food Remaining: "
-        f"{len(env.food_positions)}"
-    )
-
-
-def run_grid_hunt():
-
-    # ---------------------------------------------------------
-    # SIMPLE REFLEX AGENT
-    # ---------------------------------------------------------
-
-    simple_agent = SimpleReflexAgent()
-
-    run_agent(
-        simple_agent,
-        "Simple Reflex Agent"
-    )
-
-    # ---------------------------------------------------------
-    # MODEL-BASED AGENT
-    # ---------------------------------------------------------
-
-    model_agent = ModelBasedAgent()
-
-    run_agent(
-        model_agent,
-        "Model-Based Agent"
-    )
+    print()
+    print(f"{algorithm} Search Agent finished!")
+    print(f"Final Score: {env.score}")
+    print(f"Steps: {env.steps}")
+    print(f"Food Remaining: {len(env.food_positions)}")
 
 
 if __name__ == "__main__":
-    run_grid_hunt()
+
+    run_search_agent('BFS')
+
+    run_search_agent('DFS')
+
+    run_search_agent('UCS')

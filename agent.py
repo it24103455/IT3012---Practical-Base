@@ -1,157 +1,295 @@
-class SimpleReflexAgent:
-    """Simple Reflex Agent using only the current percept."""
+from collections import deque
+import heapq
 
-    def sense_and_act(self, percept: dict) -> str:
 
-        # IF food is here THEN suck it
-        if percept['food_here']:
-            return 'Suck'
-
-        # IF wall is ahead THEN turn left
-        if percept['wall_ahead']:
-            return 'TurnLeft'
-
-        # ELSE move forward
-        return 'MoveForward'
-
-class ModelBasedAgent:
-    """
-    Model-Based Agent.
-
-    Uses internal memory of visited positions and previously
-    encountered states to avoid repeatedly following the same path.
-    """
+class SearchAgent:
 
     def __init__(self):
-        self.estimated_pos = [0, 0]
-        self.facing = 'Right'
+        self.plan = []
+        self.active_algo = 'BFS'
 
-        # Memory
-        self.visited_cells = {(0, 0)}
-        self.visited_states = set()
+    def get_neighbors(self, position, grid_size, walls):
+        """
+        Returns all valid neighboring cells and the action
+        required to move to each cell.
+        """
 
-        self.last_action = None
-        self.last_percept = None
-
-    def move_position(self, position, direction):
         x, y = position
+        width, height = grid_size
 
-        if direction == 'Up':
-            return (x, y + 1)
-        elif direction == 'Down':
-            return (x, y - 1)
-        elif direction == 'Left':
-            return (x - 1, y)
-        elif direction == 'Right':
-            return (x + 1, y)
+        possible_moves = [
+            ((x, y + 1), 'Up'),
+            ((x, y - 1), 'Down'),
+            ((x - 1, y), 'Left'),
+            ((x + 1, y), 'Right')
+        ]
 
-        return (x, y)
+        neighbors = []
 
-    def turn_left_direction(self):
-        directions = ['Up', 'Left', 'Down', 'Right']
-        index = directions.index(self.facing)
-        self.facing = directions[(index + 1) % 4]
+        for new_position, action in possible_moves:
 
-    def turn_right_direction(self):
-        directions = ['Up', 'Right', 'Down', 'Left']
-        index = directions.index(self.facing)
-        self.facing = directions[(index + 1) % 4]
+            nx, ny = new_position
 
-    def update_internal_state(self):
+            # Stay inside the grid
+            if nx < 0 or nx >= width:
+                continue
 
-        # Update position after previous MoveForward
-        if self.last_action == 'MoveForward':
+            if ny < 0 or ny >= height:
+                continue
 
-            if self.last_percept is not None:
-                if not self.last_percept['wall_ahead']:
+            # Do not move through walls
+            if new_position in walls:
+                continue
 
-                    new_position = self.move_position(
-                        self.estimated_pos,
-                        self.facing
+            neighbors.append((new_position, action))
+
+        return neighbors
+
+    # ==========================================
+    # BFS
+    # ==========================================
+
+    def bfs_search(self, start, goal, grid_size, walls):
+
+        frontier = deque()
+
+        # Store starting position and path
+        frontier.append((start, []))
+
+        reached = {start}
+
+        while frontier:
+
+            current, path = frontier.popleft()
+
+            if current == goal:
+                return path
+
+            for neighbor, action in self.get_neighbors(
+                current,
+                grid_size,
+                walls
+            ):
+
+                if neighbor not in reached:
+
+                    reached.add(neighbor)
+
+                    new_path = path + [action]
+
+                    frontier.append(
+                        (neighbor, new_path)
                     )
 
-                    self.estimated_pos = list(new_position)
+        return []
 
-        # Update facing after previous turn
-        elif self.last_action == 'TurnLeft':
-            self.turn_left_direction()
+    # ==========================================
+    # DFS
+    # ==========================================
 
-        elif self.last_action == 'TurnRight':
-            self.turn_right_direction()
+    def dfs_search(self, start, goal, grid_size, walls):
 
-        # Remember current position
-        self.visited_cells.add(tuple(self.estimated_pos))
+        frontier = []
 
-    def sense_and_act(self, percept: dict):
+        # Stack for DFS
+        frontier.append((start, []))
 
-        # Update internal model from previous action
-        self.update_internal_state()
+        reached = {start}
 
-        # Save current percept
-        self.last_percept = percept.copy()
+        while frontier:
 
-        current_state = (
-            tuple(self.estimated_pos),
-            self.facing
+            current, path = frontier.pop()
+
+            if current == goal:
+                return path
+
+            for neighbor, action in self.get_neighbors(
+                current,
+                grid_size,
+                walls
+            ):
+
+                if neighbor not in reached:
+
+                    reached.add(neighbor)
+
+                    new_path = path + [action]
+
+                    frontier.append(
+                        (neighbor, new_path)
+                    )
+
+        return []
+
+    # ==========================================
+    # UCS
+    # ==========================================
+
+    def ucs_search(self, start, goal, grid_size, walls):
+
+        frontier = []
+
+        counter = 0
+
+        # (cost, counter, position, path)
+        heapq.heappush(
+            frontier,
+            (0, counter, start, [])
         )
 
-        # Remember this state
-        self.visited_states.add(current_state)
+        reached = {start: 0}
 
-        # --------------------------------
-        # Rule 1: Food
-        # --------------------------------
+        while frontier:
 
-        if percept['food_here']:
-            self.last_action = 'Suck'
-            return 'Suck'
+            cost, _, current, path = heapq.heappop(
+                frontier
+            )
 
-        # --------------------------------
-        # Rule 2: Wall ahead
-        # --------------------------------
+            if current == goal:
+                return path
 
-        if percept['wall_ahead']:
+            for neighbor, action in self.get_neighbors(
+                current,
+                grid_size,
+                walls
+            ):
 
-            # Change direction when blocked
-            self.last_action = 'TurnRight'
-            return 'TurnRight'
+                # Every movement has a cost of 1
+                new_cost = cost + 1
 
-        # --------------------------------
-        # Rule 3: Avoid repeated states
-        # --------------------------------
+                if (
+                    neighbor not in reached
+                    or new_cost < reached[neighbor]
+                ):
 
-        forward_position = self.move_position(
-            self.estimated_pos,
-            self.facing
-        )
+                    reached[neighbor] = new_cost
 
-        forward_position = tuple(forward_position)
+                    counter += 1
 
-        if forward_position in self.visited_cells:
+                    new_path = path + [action]
 
-            # Try changing direction instead of
-            # continuing through an already visited cell.
+                    heapq.heappush(
+                        frontier,
+                        (
+                            new_cost,
+                            counter,
+                            neighbor,
+                            new_path
+                        )
+                    )
 
-            self.last_action = 'TurnRight'
-            return 'TurnRight'
+        return []
 
-        # --------------------------------
-        # Rule 4: Explore new location
-        # --------------------------------
+    # ==========================================
+    # Select Search Algorithm
+    # ==========================================
 
-        self.last_action = 'MoveForward'
-        return 'MoveForward'
+    def search(self, start, goal, grid_size, walls):
 
+        if self.active_algo == 'BFS':
 
-class SimpleReflexAgent:
-    """Simple Reflex Agent using only the current percept."""
+            return self.bfs_search(
+                start,
+                goal,
+                grid_size,
+                walls
+            )
 
-    def sense_and_act(self, percept: dict):
+        elif self.active_algo == 'DFS':
 
-        if percept['food_here']:
-            return 'Suck'
+            return self.dfs_search(
+                start,
+                goal,
+                grid_size,
+                walls
+            )
 
-        if percept['wall_ahead']:
-            return 'TurnLeft'
+        elif self.active_algo == 'UCS':
 
-        return 'MoveForward'
+            return self.ucs_search(
+                start,
+                goal,
+                grid_size,
+                walls
+            )
+
+        return []
+
+    # ==========================================
+    # Find Closest Food
+    # ==========================================
+
+    def find_closest_food(
+        self,
+        start,
+        food_positions,
+        grid_size,
+        walls
+    ):
+
+        closest_food = None
+        closest_path = None
+
+        for food in food_positions:
+
+            food = tuple(food)
+
+            path = self.search(
+                start,
+                food,
+                grid_size,
+                walls
+            )
+
+            if path:
+
+                if (
+                    closest_path is None
+                    or len(path) < len(closest_path)
+                ):
+
+                    closest_food = food
+                    closest_path = path
+
+        return closest_food, closest_path
+
+    # ==========================================
+    # Sense and Act
+    # ==========================================
+
+    def sense_and_act(self, percept):
+
+        # Create a new plan only when
+        # there is no existing plan.
+        if not self.plan:
+
+            start = tuple(percept['agent_pos'])
+
+            grid_size = percept['grid_size']
+
+            walls = {
+                tuple(wall)
+                for wall in percept['walls']
+            }
+
+            all_food = [
+                tuple(food)
+                for food in percept['all_food']
+            ]
+
+            _, path = self.find_closest_food(
+                start,
+                all_food,
+                grid_size,
+                walls
+            )
+
+            if path is not None:
+                self.plan = path
+
+        # Execute the plan one action at a time
+        if self.plan:
+            return self.plan.pop(0)
+
+        # Fallback if no path exists
+        return 'Up'

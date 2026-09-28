@@ -143,7 +143,14 @@ class VisualGridHuntGame:
                 self.score,
 
             'remaining_food':
-                len(self.food_positions)
+                len(self.food_positions),
+
+            # Practical 03 additions
+            'grid_size': (self.width, self.height),
+            'walls': list(self.walls),
+            'all_food': list(self.food_positions)
+                
+
         }
 
     # =============================================================
