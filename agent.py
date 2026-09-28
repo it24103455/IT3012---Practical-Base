@@ -1,8 +1,10 @@
 from collections import deque
 import heapq
+import math
 
 
 class SearchAgent:
+    
 
     def __init__(self):
         self.plan = []
@@ -180,6 +182,124 @@ class SearchAgent:
 
         return []
 
+    def  astar_search(
+        self,
+        start_pos,
+        goal_pos,
+        walls,
+        grid_size,
+        heuristic_type='manhattan'
+    ):
+        """
+        A* Search Algorithm.
+
+        Uses:
+            f(n) = g(n) + h(n)
+        """
+
+        frontier = []
+
+        reached_states = set()
+
+        # Starting node
+        g_cost = 0
+
+        if heuristic_type == 'manhattan':
+            h_cost = self.manhattan_distance(
+                start_pos,
+                goal_pos
+            )
+        else:
+            h_cost = self.euclidean_distance(
+                start_pos,
+                goal_pos
+            )
+
+        f_cost = g_cost + h_cost
+
+        # Required A* tuple:
+        # (f_cost, g_cost, current_pos, path_taken)
+
+        heapq.heappush(
+            frontier,
+            (
+                f_cost,
+                g_cost,
+                start_pos,
+                []
+            )
+        )
+
+        while frontier:
+
+            f_cost, g_cost, current_pos, path_taken = (
+                heapq.heappop(frontier)
+            )
+
+            # Goal reached
+            if current_pos == goal_pos:
+                return path_taken
+
+            # Skip states already explored
+            if current_pos in reached_states:
+                continue
+
+            reached_states.add(current_pos)
+
+            # Get neighboring cells
+            for neighbor, action in self.get_neighbors(
+                current_pos,
+                grid_size,
+                walls
+            ):
+
+                # Skip already reached states
+                if neighbor in reached_states:
+                    continue
+
+                # New path cost
+                new_g_cost = g_cost + 1
+
+                # Calculate heuristic
+                if heuristic_type == 'manhattan':
+
+                    new_h_cost = self.manhattan_distance(
+                        neighbor,
+                        goal_pos
+                    )
+
+                else:
+
+                    new_h_cost = self.euclidean_distance(
+                        neighbor,
+                        goal_pos
+                    )
+
+                # f(n) = g(n) + h(n)
+                new_f_cost = (
+                    new_g_cost +
+                    new_h_cost
+                )
+
+                new_path = path_taken + [action]
+
+                heapq.heappush(
+                    frontier,
+                    (
+                        new_f_cost,
+                        new_g_cost,
+                        neighbor,
+                        new_path
+                    )
+                )
+
+        # No path found
+        return []    
+
+        
+
+
+
     # ==========================================
     # Select Search Algorithm
     # ==========================================
@@ -259,7 +379,7 @@ class SearchAgent:
 
     def sense_and_act(self, percept):
 
-        # Create a new plan only when
+         # Create a new plan only when
         # there is no existing plan.
         if not self.plan:
 
@@ -277,19 +397,82 @@ class SearchAgent:
                 for food in percept['all_food']
             ]
 
-            _, path = self.find_closest_food(
-                start,
-                all_food,
-                grid_size,
-                walls
-            )
+            # ==========================================
+            # BFS / DFS / UCS
+            # ==========================================
 
-            if path is not None:
-                self.plan = path
+            if self.active_algo in ['BFS', 'DFS', 'UCS']:
 
-        # Execute the plan one action at a time
+                _, path = self.find_closest_food(
+                    start,
+                    all_food,
+                    grid_size,
+                    walls
+                )
+
+                if path is not None:
+                    self.plan = path
+
+            # ==========================================
+            # A* Search
+            # ==========================================
+
+            elif self.active_algo == 'AStar':
+
+                closest_path = None
+
+                # Find the closest food using A*
+                for food in all_food:
+
+                    path = self.astar_search(
+                        start_pos=start,
+                        goal_pos=food,
+                        walls=walls,
+                        grid_size=grid_size,
+                        heuristic_type='manhattan'
+                    )
+
+                    if path:
+
+                        if (
+                            closest_path is None
+                            or len(path) < len(closest_path)
+                        ):
+                            closest_path = path
+
+                # Store the A* plan
+                if closest_path is not None:
+                    self.plan = closest_path
+
+        # ==========================================
+        # Execute the plan
+        # ==========================================
+
         if self.plan:
             return self.plan.pop(0)
 
         # Fallback if no path exists
         return 'Up'
+
+    def   manhattan_distance(self, pos, goal):
+        """
+        Calculate Manhattan distance between two positions.
+        """
+
+        x1, y1 = pos
+        x2, y2 = goal
+
+        return abs(x1 - x2) + abs(y1 - y2)
+
+    def euclidean_distance(self, pos, goal):
+        """
+        Calculate Euclidean distance between two positions.
+        """
+
+        x1, y1 = pos
+        x2, y2 = goal
+
+        return math.sqrt(
+            (x1 - x2) ** 2 +
+            (y1 - y2) ** 2
+        )

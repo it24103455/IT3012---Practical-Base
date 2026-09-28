@@ -1,6 +1,7 @@
 # visual_grid_game.py
 import random
 import tkinter as tk
+from agent import SearchAgent
 
 
 class VisualGridHuntGame:
@@ -301,6 +302,10 @@ class GridGameGUI:
 
         self.root = root
 
+        self.agent = SearchAgent()
+        self.agent.active_algo = 'AStar'
+
+
         self.root.title(
             "IT3012 - Scalable Multi-Agent Grid Hunt"
         )
@@ -566,14 +571,10 @@ class GridGameGUI:
 
             if not self.env.is_done():
 
-                # Select a random action
-                action = random.choice([
-                    'Up',
-                    'Down',
-                    'Left',
-                    'Right'
-                ])
+                percept = self.env.get_percept()
+                action = self.agent.sense_and_act(percept)
 
+               
                 # Execute action
                 self.env.execute_action(action)
 
